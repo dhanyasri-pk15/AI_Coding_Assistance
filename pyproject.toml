@@ -1,0 +1,39 @@
+[project]
+name = "coder-agent"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+authors = [
+    { email = "dhanyapk1504@gmail.com" }
+]
+requires-python = ">=3.12"
+dependencies = [
+    "fastapi>=0.110.0",
+    "uvicorn>=0.27.0",
+    "pydantic>=2.6.0",
+    "langgraph>=0.1.30",
+    "sqlalchemy>=2.0.25",
+    "asyncpg>=0.29.0",
+    "boto3>=1.34.0",
+    "httpx>=0.27.0",
+    "python-dotenv>=1.0.1",
+    "psycopg[binary]>=3.1.18",
+    "langgraph-checkpoint-postgres>=3.0.5",
+    "mcp>=1.26.0,<2.0.0",
+    "langchain-aws",
+    "langgraph",
+    "boto3",
+    "pydantic",
+    "dotenv",
+    "fastmcp",
+    "langchain_mcp_adapters",
+    "psycopg2>=2.9.11",
+    "langchain-google-genai>=2.0.0",
+]
+
+[project.scripts]
+coder-agent = "coder_agent:main"
+
+[build-system]
+requires = ["uv_build>=0.12.10,<0.13.0"]
+build-backend = "uv_build"

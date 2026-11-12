@@ -1,0 +1,583 @@
+@startuml ChatBot AI
+ 
+
+skinparam sequenceMessageAlign left
+skinparam maxMessageSize 200
+skinparam noteBackgroundColor lightyellow
+autonumber 1.1
+ 
+title Coffee ChatBot AI
+ 
+actor User
+activate User
+ 
+participant "main.py" as Main
+participant "router/router.py" as Router
+participant "service/service.py" as Service
+participant "agents/coder.py" as Coder
+participant "agents/researcher.py" as Researcher
+participant "agents/reviewer.py" as Reviewer
+participant "models/models.py" as Models
+participant "database/database.py" as DataBase
+participant "mcp_client/context7.py" as Context7
+participant "mcp_client/pep8.py" as PeP8
+participant "schema/schema.py" as Schema
+participant "migrations/migration.py" as Migration
+participant "seeders/seeders.py" as Seeder
+ 
+note over Main
+from fastapi import FastAPI
+from router.router import router
+from migrations.migrations import run_migrations
+from seeders.seeders import seed_customers
+from service.service import GraphService
+end note
+ 
+note over Router
+from fastapi import APIRouter, Depends, HTTPException
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select
+from models.models import ChatRequest, ChatResponse
+from database.database import get_db
+from schema.schema import Customers, ErrorLogs
+from service.service import GraphService
+end note
+ 
+note over Service
+import os
+import boto3
+from langgraph.graph import StateGraph, START, END
+from langchain_aws import ChatBedrock
+from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
+from models.state import AgentState
+from agents.coder import CoderAgent
+from agents.reviewer import ReviewerAgent
+from agents.researcher import ResearchAgent
+from mcp_clients.context7 import Context7Client
+end note
+
+note over Migration
+from database.database import engine
+from schema.schema import Base
+end note
+ 
+note over Seeder
+import uuid
+from sqlalchemy.dialects.postgresql import insert
+from database.database import AsyncSessionLocal
+from schema.schema import Customers
+end note
+
+note over Schema 
+import uuid
+from sqlalchemy import Column, String, Boolean, DateTime, text
+from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy.sql import func
+from database.database import Base
+end note
+ 
+note over Models
+from pydantic import BaseModel
+from typing import List
+end note
+
+note over DataBase
+import os
+from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
+from sqlalchemy.orm import sessionmaker, declarative_base
+from dotenv import load_dotenv
+end note
+
+note over Coder
+from langgraph.prebuilt import create_react_agent
+from agents.prompts import coder_prompt
+from mcp_clients.pep8 import Pep8Client
+end note
+
+note over Researcher
+from langgraph.prebuilt import create_react_agent
+from agents.prompts import research_prompt
+from mcp_clients.context7 import Context7Client
+end note
+
+note over Reviewer
+from langgraph.prebuilt import create_react_agent
+from agents.prompts import reviewer_prompt
+from mcp_clients.context7 import Context7Client
+end note
+
+note over Context7
+from langchain_mcp_adapters.client import MultiServerMCPClient
+import os
+end note
+
+note over PeP8
+from langchain_mcp_adapters.client import MultiServerMCPClient
+import os
+end note
+ 
+User -> Main : user hits the endpoint /chat
+note over User
+POST http://0.0.0.0:8000/chat
+{
+"thread_id": "a1b2c3d4-e5f6-7890-abcd-ef9876543210"
+"message": "Give me a code to convert Integer to Roman"
+}
+end note
+activate Main
+Main -> Main : In  a variable **app** create an instance for FastApI.
+Main -> Main : In a variable **graph_service** create an instance for GraphService.
+activate Service
+Service -> Service : Initialize graph as None
+Service -> Service : Initialize tools as None
+Service -> Service : get the llm model and store it in llm variable
+Service -> Service : Initialize checkpointer as None
+Service -> Service : Initialize checkpointer_context as None
+Service -> Service : In a variabler coder create the instance of CoderAgent
+activate Coder
+Coder -> Coder : Initialize agent as None.
+Coder -> Coder : Initialize llm as None.
+Coder -> Coder : Initialize tools as None
+deactivate Coder
+Service -> Service : In a variable reviewer create the instance of ReviewerAgent
+activate Reviewer
+Reviewer -> Reviewer : Initialize agent as None.
+Reviewer -> Reviewer : Initialize llm as None.
+Reviewer -> Reviewer : Initialize tools as None
+deactivate Reviewer
+Service -> Service : In a variable researcher create the instance of ResearcherAgent
+activate Researcher
+Researcher -> Researcher : Initialize agent as None.
+Researcher -> Researcher : Initialize llm as None.
+Researcher -> Researcher : Initialize tools as None
+deactivate Researcher
+deactivate Service
+Main -> Main : Use a decorator called on_event which runs the function **startup_event** automatically when the apllication starts.
+group startup_event
+  Main -> Migration : calls the function run_migrations
+    activate Migration
+      group run_migrations
+        Migration -> Migration : opens a database connection safely with a connection object
+        Migration -> Schema : creates all tables in the database
+        activate Schema
+        Schema -> Schema : The Customers table and ErrorLogs table are created.
+        Schema -> Migration : Returns to the migration.
+        deactivate Schema
+        Migration -> Main : returns to the main function.
+      end group
+    deactivate Migration
+    Main -> Seeder : calls the function seed_customers
+    activate Seeder
+    Seeder -> Seeder : In a variable **sample_customers** store the details of customers(customer_id,customer_name,phone_no,email)
+      group seed_customers
+        Seeder -> Seeder : Opens a database session
+        loop each customer in sample_customers
+        Seeder -> Seeder : In a variable stmt craete an insert query for the Customers table.
+        Seeder -> Seeder : If duplicate data comes, don't crash. Check conflict based on customer_id.
+        Seeder -> DataBase : Run the insert query in the database.
+        activate DataBase
+        DataBase -> DataBase : Save the changes permanently to the database.
+        deactivate DataBase
+        end loop
+        Seeder -> Main : returns to the main.
+      end group
+    deactivate Seeder
+    Main -> Service : call a function compile using graph_service in Service.
+    activate Service
+      group compile
+        Service -> Coder : Create the Coder Agent using create_agent function.
+        activate Coder
+        group create_agent
+        group try
+        Coder -> Service : In a variable llm call the function get_llm
+        group get_llm
+        Service -> Service : create a boto3 client in a variable bedrock_client using service_name,region_name.
+        Service -> Coder : return the llm model.
+        end group
+        Coder -> Coder : In a variable pep8 create the instance of Pep8Client.
+        activate PeP8
+        PeP8 -> PeP8 : Initialize client as None.
+        PeP8 -> PeP8 : Initialize tools as None.
+        deactivate PeP8
+        Coder -> PeP8 : In a variable tools call the get_tools function from the pep8.
+        activate PeP8
+        group get_tools
+        alt there is no client
+        PeP8 -> PeP8 : calls a function connect
+        group connect
+        alt if no client present
+        PeP8 -> PeP8: In a variable client use MultiServerMCPClient with transport(streamable_http) and PEP8_URL.
+        end
+        end group
+        end
+        alt tools are already present
+        PeP8 -> Coder : return the already existing tools
+        end
+        PeP8 -> PeP8 : In a variable tools call get_tools function to get the tools of pep8 server.
+        PeP8 -> Coder : return the tools to the coder agent.
+        end group
+        deactivate PeP8
+        Coder -> Coder : In a variable agent create a agent using create_react_agent using llm,tools and coder_prompts.
+        end try
+        group exception
+        Coder -> User : cannot create coder agent.
+        note over User
+        code : 500
+        status : INTERNAL_SERVER_ERROR
+        message : Tool agent creation failed. annot load tools from pep8 server.
+        end note
+        end exception
+        end group
+        Coder -> Service : returns to the service.
+        deactivate Coder
+        Service -> Reviewer : Create the Reviewer Agent using create_agent .
+        activate Reviewer
+        group create_agent
+        group try
+        Reviewer -> Service : In a variable llm call the function get_llm
+        group get_llm
+        Service -> Service : create a boto3 client in a variable bedrock_client using service_name,region_name.
+        Service -> Reviewer : return the llm model.
+        end group
+        Reviewer -> Reviewer : In a varible context7 create an instance of Context7Client.
+        activate Context7
+        Context7 -> Context7 : Initialize api_key with the api_key.
+        Context7 -> Context7 : initialize client as None
+        Context7 -> Context7 : Initialize tools as None
+        deactivate Context7
+        Reviewer -> Context7 : In a variable tools call the get_tools function from the context7.
+        activate Context7
+        group get_tools
+        alt there is no client
+        Context7 -> Context7 : calls a function connect
+        group connect
+        alt if no client present
+        Context7 -> Context7: In a variable client use MultiServerMCPClient with transport(streamable_http) CONTEXT7_URL and api_key.
+        end
+        end group
+        end
+        alt tools are already present
+        Context7 -> Reviewer : return the already existing tools
+        end
+        Context7 -> Context7 : In a variable tools call get_tools function to get the tools of context7 server.
+        Context7 -> Reviewer : return the tools to the reviewer agent.
+        end group
+        deactivate Context7
+        Reviewer -> Reviewer : In a variable agent create a agent using create_react_agent using llm,tools and reviewer_prompts.
+        end try
+        group exception
+        Reviewer -> User : cannot create reviewer agent.
+        note over User
+        code : 500
+        status : INTERNAL_SERVER_ERROR
+        message : Tool agent creation failed. Using LLM fallback : TaskGroup.
+        end note
+        end exception
+        end group
+        Reviewer -> Service : returns to the service.
+        deactivate Reviewer
+        Service -> Researcher : Create the Researcher Agent using create_agent.
+        activate Researcher
+        group create_agent
+        group try
+        Researcher -> Service : In a variable llm call the function get_llm
+        group get_llm
+        Service -> Service : create a boto3 client in a variable bedrock_client using service_name,region_name.
+        Service -> Researcher : return the llm model.
+        end group
+        Researcher -> Researcher : In a varible context7 create an instance of Context7Client.
+        activate Context7
+        Context7 -> Context7 : Initialize api_key with the api_key.
+        Context7 -> Context7 : initialize client as None
+        Context7 -> Context7 : Initialize tools as None
+        deactivate Context7
+        Researcher -> Context7 : In a variable tools call the get_tools function from the context7.
+        activate Context7
+        group get_tools
+        alt there is no client
+        Context7 -> Context7 : calls a function connect
+        group connect
+        alt if no client present
+        Context7 -> Context7: In a variable client use MultiServerMCPClient with transport(streamable_http) CONTEXT7_URL and api_key.
+        end
+        end group
+        end
+        alt tools are already present
+        Context7 -> Researcher : return the already existing tools
+        end
+        Context7 -> Context7 : In a variable tools call get_tools function to get the tools of context7 server.
+        Context7 -> Researcher : return the tools to the researcher agent.
+        end group
+        deactivate Context7
+        Researcher -> Researcher : In a variable agent create a agent using create_react_agent using llm,tools and researcher_prompts.
+        end try
+        group exception
+        Researcher -> User : cannot create coder agent.
+        note over User
+        code : 500
+        status : INTERNAL_SERVER_ERROR
+        message : Tool agent creation failed. Cannot create researcher agent.
+        end note
+        end exception
+        end group
+        Researcher -> Service : returns to the service.
+        deactivate Researcher
+        Service -> Service : In a variable builder create a graph builder with StateGraph(manages flow between agents) and AgentState(shared memory between nodes)
+        Service -> Service : Add node named coder which executes coder_node to the builder.
+        group coder_node
+        Service -> Coder : calls invoke_agent of Coder agent with state.
+        activate Coder
+        group invoke_agent
+        Coder -> Coder : Get message from the state and store it in a variable message.
+        Coder -> Coder : Get researched data from the state and store it in a variable research
+        Coder -> Coder : In a variable query have the user request and research context.
+          group try
+          alt agent is created
+          Coder -> Coder : In a variable result invoke the model using the agent with role:user and the query.
+          Coder -> Coder : In a variable code store the AI Response from the model
+          else no agent is created
+          Coder -> Coder : In a variable result invoke the model without agent only with the query.
+          Coder -> Coder : In a variable code get the result
+          end
+          Coder -> Service : return the code and the current iteration to store it in state
+          note over Service
+          code : The generated code
+          step : state["step"]+1
+          end note
+          end try
+          group exception
+          Coder -> User : Coder tool failed
+          Coder -> Coder : In a variable result invoke the model without agent only with the query.
+          Coder -> Coder : In a variable code get the result
+          end exception
+          end group
+        deactivate Coder
+        end group
+        Service -> Service : Add node named reviewer which executes reviewer_node to the builder.
+        group reviewer_node
+        Service -> Reviewer : calls invoke_agent of Reviewer agent with state.
+        activate Reviewer
+        group invoke_agent
+        Reviewer-> Reviewer : Get the code from the state and store it in a variable code.
+        Reviewer -> Reviewer : In a variable query have the code.
+          group try
+          alt agent is created
+          Reviewer -> Reviewer : In a variable result invoke the model using the agent with role:user and the query.
+          Reviewer -> Reviewer : In a variable feedback store the AI Response from the model
+          else no agent is created
+          Reviewer -> Reviewer : In a variable result invoke the model without agent only with the query.
+          Reviewer -> Reviewer : In a variable code get the result
+          end
+          alt approved in feedback
+          Reviewer -> Reviewer : In a variable approved store as approved
+          else not approved in feedback
+          Reviewer -> Reviewer : In a variable approved store as not approved
+          end
+          Reviewer -> Service : return the review_feedback,approved,step to service to store in state.
+          note over Service
+          reviewer_feedback: feedback
+          approved:approved
+          step: state["step"]+1
+          end note
+          end try
+          group exception
+          Reviewer -> User : Reviewer tool failed
+          Reviewer-> Reviewer : In a variable result invoke the model without agent only with the query.
+          Reviewer -> Reviewer : In a variable code get the result
+          end exception
+          end group
+        deactivate Reviewer
+        end group
+        Service -> Service : Add node named research which executes research_node to the builder.
+        group research_node
+        Service -> Researcher : calls invoke_agent of Researcher agent with state.
+        activate Researcher
+        group invoke_agent
+        Researcher-> Researcher : Get the message from the state and store it in a variable message.
+          group try
+          alt agent is created
+          Researcher -> Researcher : In a variable result invoke the model using the agent with role:user and the message.
+          Researcher -> Researcher : In a variable response store the AI Response from the model
+          else no agent is created
+          Researcher -> Researcher : In a variable result invoke the model without agent only with the message.
+          Researcher -> Researcher : In a variable research get the result
+          end
+         
+          Researcher -> Service : return the researched_data,step to service to store in state.
+          note over Service
+          researched_data: research
+          step: state["step"]+1
+          end note
+          end try
+          group exception
+          Researcher -> User : researcher tool failed
+          Researcher-> Researcher : In a variable result invoke the model without agent only with the message.
+          Researcher -> Researcher : In a variable code get the result
+          end exception
+          end group
+        deactivate Researcher
+        end group
+        Service -> Service : From start node decide where to go, the start_router function decides it(give coder,reviewer and research).
+        group start_router
+          Service -> Service : This function runs at the start of the graph , decides which agent to run first.
+          Service -> Service : In a variable msg extracts the user message and converts into lowercase.
+          alt message contains both research and coder
+          Service -> Service : start with the researcher agent.
+          end
+          alt message contains only research
+          Service -> Service : Go to the researcher agent.
+          end
+          alt message contains review
+          Service -> Service : starts with the reviewer agent.
+          end
+          Service -> Service : By default start with the coder agent.
+        end group
+        Service -> Service : Define the flow that after **coder** finishes go to the **reviewer**.
+        Service -> Service : Now the **reviewer** will take the decision so we call reviewer_router
+        Service -> Service : If reviewer says go to research node , it will go to the research node otherwise stop the execution.
+        group reviewer_router
+          Service -> Service : in a variable approved get the approval status from the state, Default it is declared as False.
+          Service -> Service : In a variable step get the current iteration count, default it is 0.
+          alt step is greater than 6
+          Service -> Service : Stop the execution.
+          end
+          alt if the status is approved by the reviewer
+          Service -> Service : Stop the execution.
+          end
+          Service -> Service : If not approved or steps still within limit go to the research agent.
+        end group
+        Service -> Service : After research go back to the coder agent
+        Service -> Service : In a variable POSTGRES_CONN_STRING store the database connection string for PostgreSQL.
+        Service -> Service : In a variable checkpointer_context create the checkpointer context which is responsible for saving the graph state and restoring state later.
+        Service -> Service : In a variable checkpointer make the connection active.
+        Service -> Service : Creates required tables in DB ,for storing states.
+        Service -> Service : Compile the graph into executable form, attach checkpointer for memory persistence.
+        Service -> Main : Returns to the main.
+      end group
+    deactivate Service      
+    Main -> Main : register the routers using the function include_routers                                                                                      
+end group
+Main -> Router : Goes to the endpoint definition in router.
+activate Router
+  Router -> Router : In a variable router create the APIRouter instance.
+  Router -> Router : In a variable graph_service create GraphService instance.
+  Router -> Router : Using a decorator define the /chat endpoint with response_model ChatResponse
+  group chat
+    Router -> Models : Do the pydantic validation for the request body.
+    activate Models
+    note over Models
+    class ChatRequest(BaseModel):
+      thread_id : uuid
+      message : str
+    end note
+    Models -> Models : checks whether the request body contains a field thread_id and it is of type uuid.
+    Models -> Models : checks whether the request body contains a field called message and it is of type string.
+    Models -> Router : returns to the router.
+    deactivate Models
+    Router -> DataBase : gets a DB session
+    activate DataBase
+    DataBase -> Router : returns with a db session
+    deactivate DataBase
+    Router -> Router : In a variable thread_id store the thread_id from the request.
+    Router -> Router : In a variable message store the message from the request.
+    group try
+      Router -> Router : In a variable result have the query to select customer with the thread_id.
+      Router -> DataBase : Opens a session to execute the query
+      activate DataBase
+      DataBase -> DataBase : execute the query
+      note over DataBase
+      select(Customers).where(Customers.customer_id == thread_id)
+      end note
+      DataBase -> Router : returns with the customer object.
+      deactivate DataBase
+      alt no customer found
+      Router -> User : Raises HTTPException
+      note over User
+      code : 404
+      status : NOT_FOUND
+      message : Customer Not Found
+      end note
+      end
+      Router -> Service : In a variable result call the function invoke with parameter thread_id and message
+      activate Service
+        group invoke
+        group try
+          alt executable graph is not found
+          Service -> Service : call compile function and get the overall executable graph.
+          end
+          Service -> Service : In a variable config pass the thread_id to the graph to maintain seperate conversation per user.
+          Service -> Service : In a variable called result execute the whole agent flowby giving the initial state
+          note over Service
+          class AgentState:
+            thread_id : thread_id,
+            message : message,
+            code : None,
+            research_data : None,
+            approved : None,
+            reviewe_feedback : None,
+            approved : false
+            step : 0
+          end note
+          Service -> Service : Attach the thread_id to the execution,connects Graph to the postgres memory.
+          loop fetch each saved checkpoint(snapshot) from the checkpointer
+          Service -> Service : calls the aget_state_history function with config.
+          Service -> Service : In a variable node_name get the source metadata from each snapshot(State at one point in execution)
+          Service -> Service : print the node_name to the terminal.
+          Service -> Service : print the state data to the terminal.
+          end
+          Service -> Router : returns the result to the Router
+        end group
+        group exception
+          Service --> User: raise exception that occurs while invoking graph
+          note over User
+                thread_id : "a1b2c3d4-e5f6-7890-abcd-ef9876543210",
+                reply : "Graph invocation failed",
+                code : None,
+                review_feedback : None,
+                research_data : None
+          end note
+          end exception
+      deactivate Service
+      Router -> User : Returns the success response to the User
+      note over User
+     {"thread_id": "a1b2c3d4-e5f6-7890-abcd-ef9876543210",
+       "reply": "Execution completed"
+       "code" : def romanToInt(self, s: str) -> int:
+                  translations = {
+                      "I": 1,
+                      "V": 5,
+                      "X": 10,
+                      "L": 50,
+                      "C": 100,
+                      "D": 500,
+                      "M": 1000
+                  }
+                  
+                  total = 0
+                  n = len(s)
+                  
+                  for i in range(n):
+                      if i < n - 1 and translations[s[i]] < translations[s[i+1]]:
+                          total -= translations[s[i]]
+                      else:
+                          total += translations[s[i]]
+                          
+                  return total
+       "review_feedback" : "The code is already optimized and satisfies the business scenario."
+       "research_data" : None
+      }
+      end note
+    end try
+    group exception
+    Router -> User : Cannot Implement MultiAgent coding Pipeline
+    note over User
+    code: 500
+    status : INTERNAL_SERVER_ERROR
+    message : CHAT ERROR : Cannot compile the graph
+    end note
+    end exception
+  end group
+deactivate Router
+deactivate Main
+@enduml
+ 

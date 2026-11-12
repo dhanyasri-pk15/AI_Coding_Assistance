@@ -1,0 +1,135 @@
+@startuml Class Diagram
+ 
+title Multi-Agent Coder Chatbot
+ 
+package "Application Layer" {
+    class FastAPI <<src/main.py>> {
+        +app: FastAPI
+        +include_router(router)
+        +health()
+    }
+}
+ 
+package "Router Layer" {
+    class Router <<src/routes/router.py>> {
+        -service: ChatService
+        +router: APIRouter
+        +chat(request: ChatRequest): ChatResponse
+    }
+}
+ 
+package "Service Layer" {
+    class Service <<src/services/service.py>> {
+        -coder_agent: CoderAgent
+        -logger: Logger
+        -repo : Repository
+        +chat_service(request : ChatRequest) : ChatResponse
+    }
+}
+ 
+package "Agent Layer" {
+    class CoderAgent <<src/agent/coder_agent.py>> {
+        -llm: get_llm()
+        -prompt: str
+        -logger: Logger
+        + agent : create_react_agent(llm, tools, prompt)
+        + llm_invoke(message) : str
+    }
+
+    class ReviewAgent <<src/agent/review_agent.py>> {
+        -llm: get_llm()
+        -prompt: str
+        -logger: Logger
+        + agent : create_react_agent(llm, tools, prompt)
+        + llm_invoke(message) : str
+    }
+
+    class ResearchAgent <<src/agent/research_agent.py>> {
+        -llm: get_llm()
+        -prompt: str
+        -logger: Logger
+        + agent : create_react_agent(llm, tools, prompt)
+        + llm_invoke(message) : str
+    }
+
+    class CoderPrompt <<src/agent/coder_prompt.py>> {
+        +SYSTEM_PROMPT: str
+    }
+    class ReviewPrompt <<src/agent/review_prompt.py>> {
+        +SYSTEM_PROMPT: str
+    }
+    class ResearchPrompt <<src/agent/research_prompt.py>> {
+        +SYSTEM_PROMPT: str
+    }
+}
+
+
+package "Repository Layer" {
+    class ErrorRepository <<src/repositories/error_repository.py>> {
+        -db: Session
+        +log_error(file_name, function_name, error_message)
+    }
+ 
+    class DBConnection <<src/repositories/db_connection.py>> {
+        +ENGINE: Engine
+        +get_db(): Session
+    }
+    
+    class Repository <<src/repository/repository.py>> {
+        -db: Session
+        + get_customer_by_id(customer_id)
+    }
+}
+
+package "Schema Layer" {
+    class Customers <<src/schema/schema.py>> {
+        +customer_id: UUID
+        +customer_name: str
+        +phone_no: str
+        +email: str
+        +created_at: datetime
+        +created_by: str
+        +updated_at: datetime
+        +updated_by: str
+        +is_active: bool
+    }
+}
+
+package "Models Layer" {
+    class ChatRequest <<src/models/chat_models.py>> {
+        +message: str
+    }
+ 
+    class ChatResponse <<src/models/chat_models.py>> {
+        +code: int
+        +status: str
+        +message: str
+        +reply: str
+    }
+
+    class ErrorResponse <<src/models/chat_models.py>> {
+        +code: int
+        +status: str
+        +message: str
+    }
+}
+ 
+FastAPI --> Router : request passes
+Router --> Service : routes to
+Service --> CoderAgent : calls Coder Agent
+Service --> ReviewAgent : calls Review Agent
+Service --> ResearchAgent : calls Research Agent
+CoderAgent --> CoderPrompt : uses CoderPrompt
+ReviewAgent --> ReviewPrompt : uses ReviewPrompt
+ResearchAgent --> ResearchPrompt : uses ResearchPrompt
+Service --> Repository : uses for checking valid customer
+Service --> ErrorRepository : uses for logging errors
+CoderAgent --> ErrorRepository : uses for logging errors
+ReviewAgent --> ErrorRepository : uses for logging errors
+ResearchAgent --> ErrorRepository : uses for logging errors
+ErrorResponse --> ChatResponse : extends
+Repository --> Customers : uses for fetching customers
+Router --> ChatRequest : validates input
+
+@enduml
+ 

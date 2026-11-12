@@ -1,0 +1,142 @@
+openapi: 3.0.3
+info:
+  title: Coder Agent API
+  description: >
+    AI-powered chatbot API for generating code,reviewing code and perform research for unknown or complex scenario problems
+  version: 1.0.0
+ 
+servers:
+  - url: http://localhost:8000
+    description: Local
+ 
+tags:
+  - name: Chat
+    description: An AI - Chatcot for assisting with coding and coding related problems
+ 
+paths:
+  /chat:
+    post:
+      tags:
+        - Chat
+      summary: Send a message to 
+      description: >
+        Customer sends a English message regarding coding related problems.
+        Coder Agent using langgraph decides orchestrate agents and decides which agent to call based on the problem scenario
+      operationId: chat
+      requestBody:
+        required: true
+        description: English message regarding coding related problems
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ChatRequest'
+            examples:
+              Coder:
+                summary: User asking for code suggestion
+                value:
+                  message: "Provide a code for adding two numbers in python"
+              Reviewer:
+                summary: User asks for code review
+                value:
+                  message: "Code snippet:def add(a,b): return a + b print(add(10,2)) - check whether the given code snippet is correct or not"
+              Researcher:
+                summary: User asks for deep research for complex scenario based question
+                value:
+                  message: "suggest me a code for dynamic programming please provide me the optimized and edge-case working code"
+      responses:
+        '200':
+          description: Successfully processed the request message
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ChatResponse'
+              examples:
+                code_reply:
+                  summary: Code Response
+                  value:
+                    code: 200
+                    status: "Success"
+                    message: "Successfully processed your message"
+                    reply: "I suggest you a code for adding two numbers in python: def add(a,b): return a + b print(add(10,2))"
+                review_reply:
+                  summary: Provided code review reply
+                  value:
+                    code: 200
+                    status: "Success"
+                    message: "Successfully processed your message"
+                    reply: "The provided code is clean and error free .If yes I can provide an alternate and optimized way of your code"
+                status_reply:
+                  summary: Deep Research Reply
+                  value:
+                    code: 200
+                    status: "Success"
+                    message: "Successfully processed your message"
+                    reply: "Sure,I will provide you a optimized and standardized code for dynamic programming by performing research in various websites"
+        '400':
+          description: Bad request message field is missing or empty
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                code: 400
+                status: "BAD_REQUEST"
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                code: 500
+                status: "INTERNAL_SERVER_ERROR"
+                message: "Unable to process your message. Please try again."
+ 
+components:
+  schemas:
+    ChatRequest:
+      type: object
+      required:
+        - message
+      properties:
+        message:
+          type: string
+          description: Requesting for code 
+          example: "Provide a code for adding two numbers in python"
+ 
+    ChatResponse:
+      type: object
+      properties:
+        code:
+          type: integer
+          description: HTTP status code
+          example: 200
+        status:
+          type: string
+          description: Response status
+          example: "Success"
+        message:
+          type: string
+          description: System message
+          example: "Successfully processed your message"
+        reply:
+          type: string
+          description: Brew Buddy's friendly reply to the customer
+          example: "I suggest you a code for adding two numbers in python: def add(a,b): return a + b print(add(10,2))"
+ 
+    ErrorResponse:
+      type: object
+      properties:
+        code:
+          type: integer
+          description: HTTP status code
+          example: 500
+        status:
+          type: string
+          description: Error status
+          example: "INTERNAL_SERVER_ERROR"
+        message:
+          type: string
+          description: Error details
+          example: "Something went wrong"
+ 
